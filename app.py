@@ -3,6 +3,7 @@ import os
 import base64
 import time
 from datetime import datetime
+import ssl
 
 app = Flask(__name__)
 
@@ -46,4 +47,8 @@ def capture():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # SSL context for HTTPS
+    ssl_context = ('ssl/cert.pem', 'ssl/key.pem')
+    
+    # Run with HTTPS
+    app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=ssl_context)
